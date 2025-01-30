@@ -70,30 +70,65 @@ public class SimpleIoCContainer {
      * @param components Set of classes annotated with @Component
      */
     private static void createAndRegisterBeans(Set<Class<?>> components) {
+        List<Class<?>> noDependencies = new ArrayList<>();
+        List<Class<?>> withDependencies = new ArrayList<>();
+
         for (Class<?> clazz : components) {
             if (!isConcreteClass(clazz)) {
                 System.err.println("Skipping non-concrete class: " + clazz.getName());
                 continue;
             }
 
-            try {
-
-                Object instance = createInstance(clazz);
-                String beanName = generateBeanName(clazz);
-
-                if (BEAN_REGISTRY.containsKey(beanName)) {
-                    System.err.println("Bean with name '" + beanName + "' already exists. Skipping: " + clazz.getName());
-                } else {
-                    BEAN_REGISTRY.put(beanName, instance);
-                    System.out.println("Registered bean: " + beanName + " (" + clazz.getName() + ")");
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to create bean for class :" + clazz.getName());
-                e.printStackTrace();
+            if (hasDependencies(clazz)) {
+                withDependencies.add(clazz);
+            } else {
+                noDependencies.add(clazz);
             }
         }
+
+        for (Class<?> clazz : noDependencies) {
+            createAndRegisterBean(clazz);
+        }
+        for (Class<?> clazz : withDependencies) {
+            createAndRegisterBean(clazz);
+        }
+
     }
 
+    /**
+     * Check if the specified class has any fields annotated with @Inject.
+     * This is used to determine whether the class depends on other components.
+     *
+     * @param clazz the class to analyze for dependency annotations.
+     * @return true if the class has at least one field annotated with @Inject, false otherwise.
+     */
+    private static boolean hasDependencies(Class<?> clazz) {
+        return Arrays.stream(clazz.getDeclaredFields())
+                .anyMatch(f -> f.isAnnotationPresent(Inject.class));
+    }
+
+    /**
+     * Creates and registers a bean for the specified class.
+     * The bean is created using reflection and dependency injection.
+     * The instance is stored in the registry.
+     *
+     * @param clazz The class for which a bean should be created and registered
+     */
+    private static void createAndRegisterBean(Class<?> clazz) {
+        try {
+            Object instance = createInstance(clazz);
+            String beanName = generateBeanName(clazz);
+
+            if (BEAN_REGISTRY.containsKey(beanName)) {
+                System.err.println("Bean with name '" + beanName + "' already exists. Skipping: " + clazz.getName());
+            } else {
+                BEAN_REGISTRY.put(beanName, instance);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to create bean for class :" + clazz.getName());
+            e.printStackTrace();
+        }
+    }
 
     /**
      * Finds the constructor to use for dependency injection:
